@@ -25,8 +25,16 @@ const char* GetArgument(char** argv, int& i)
     return argv[++i];
 }
 
+void help()
+{
+    printf("Usage: fastscan <flags> <targets>\n");
+    printf("\t-p - ports to scan\n");
+    printf("\texample:\t-p12,43,56-234\n");
+}
+
 int main(int argc, char** argv)
 {
+    if (argc < 2) help();
     std::vector<std::string_view> args(argv + 1, argv + argc);
     std::vector<IpAddress> addresses;
     PortScanner scanner;
@@ -37,6 +45,8 @@ int main(int argc, char** argv)
             char* ports = (char*)GetArgument(argv, i);
             scanner.ParsePortsToScan(ports);
         }
+        else if (compareFlag(argv[i], "-h"))
+            help();
         else
             addresses.push_back(std::string_view(argv[i]));
     }
