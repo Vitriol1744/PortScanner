@@ -51,15 +51,6 @@ void PortScanner::ParsePortsToScan(char* ports)
     }
 }
 
-void Scan(PortScanner* scanner, IpAddress host, std::vector<int>* ports)
-{
-    for (auto port : *ports)
-    {
-        if (scanner->PortIsOpen(host, port))
-            LogInfo("{}: Port {} is open", std::string_view(host), port);
-    }
-}
-
 void PortScanner::ScanPorts(std::vector<IpAddress> addresses)
 {
     std::set<const char*> aliveHosts;
@@ -74,33 +65,29 @@ void PortScanner::ScanPorts(std::vector<IpAddress> addresses)
 
     }
 
-    auto scanPort = [this](IpAddress ip, int port){
-        if (PortIsOpen(ip, port))
-            LogInfo("{}: Port {} is open", std::string_view(ip), port);
-    };
-
-    int maxThreads = 64;//std::thread::hardware_concurrency();
+    int maxThreads = std::thread::hardware_concurrency();
     std::vector<int> ports[maxThreads];
     int i = 0;
+    // Divide work for threads
     for (auto port : portsToScan)
     {
         if (i >= maxThreads) i = 0;
         ports[i].push_back(port);
         i++;
     }
-    auto scan = [](PortScanner* scanner, IpAddress& host, std::vector<int>& ports)
+    auto scan = [](PortScanner* scanner, IpAddress host, std::vector<int>* ports)
+    {
+        for (auto port : *ports)
         {
-            for (auto port : ports)
-            {
-                if (scanner->PortIsOpen(host, port))
-                    LogInfo("{}: Port {} is open", std::string_view(host), port);
-            }
-        };
+            if (scanner->PortIsOpen(host, port))
+                LogInfo("{}: Port {} is open", std::string_view(host), port);
+        }
+    };
     for (auto host : aliveHosts)
     {
         LogTrace("Scanning {}...", std::string_view(host));
         std::thread threads[maxThreads];
-        for (int i = 0; i < maxThreads; i++) threads[i] = std::thread(Scan, this, IpAddress(host), &ports[i]);
+        for (int i = 0; i < maxThreads; i++) threads[i] = std::thread(scan, this, IpAddress(host), &ports[i]);
         for (int i = 0; i < maxThreads; i++) threads[i].join();
         /*for (auto port : portsToScan)
         {
