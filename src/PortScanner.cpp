@@ -79,65 +79,64 @@ void PortScanner::ParsePortsToScan(char* ports)
     }
 }
 
-void PortScanner::ScanPorts(std::vector<IpAddress> addresses)
+void PortScanner::Scan(std::set<Target>& targets)
 {
-    std::set<const char*> aliveHosts;
-    for (auto ip : addresses)
+    std::set<Target> aliveTargets;
+    for (auto target : targets)
     {
-        if (Ping(ip)) 
+        if (Ping(target)) 
         {
-            aliveHosts.insert(ip.addr.data());
-            LogInfo("{} is Alive", std::string_view(ip));
+            aliveTargets.insert(target);
+            LogInfo("{} is Alive", std::string_view(target));
         }
-        else LogInfo("{} is Down", std::string_view(ip));
-
+        else LogInfo("{} is Down", std::string_view(target));
     }
+    ScanPorts(aliveTargets);
+}
 
+void PortScanner::ScanPorts(std::set<Target>& targets)
+{
+    // Divide work for threads
     std::vector<int> ports[threadCount];
     int i = 0;
-    // Divide work for threads
     for (auto port : portsToScan)
     {
         if (i >= threadCount) i = 0;
         ports[i].push_back(port);
         i++;
     }
-    auto scan = [](IpAddress host, std::vector<int>* ports)
+
+    auto popSocket = [](Target& target)
+    {
+        lock.lock();
+        Socket socket = sockets.front();
+        sockets.pop();
+        lock.unlock();
+        if (socket.IsConnected())
+        {
+            LogInfo("{}: Port {} is open", socket.target, socket.port);
+            target.openPorts.insert(socket.port);;
+        }
+    };
+    auto scan = [popSocket](Target target, std::vector<int>* ports)
     {
         for (auto port : *ports)
         {
             if (sockets.size() > 512)
-            {
-                lock.lock();
-                Socket socket = sockets.front();
-                sockets.pop();
-                lock.unlock();
-                if (socket.IsConnected())
-                    LogInfo("{}: Port {} is open", socket.target, socket.port);
-
-            }
-            if (PortScanner::PortIsOpen(host, port))
- ;//               LogInfo("{}: Port {} is open", std::string_view(host), port);
+                popSocket(target);
+            PortScanner::PortIsOpen(target, port);
         }
+        while (!sockets.empty()) popSocket(target);
     };
-    auto scanPort = [](IpAddress addr, int port)
-        {
-            if (PortIsOpen(addr, port)) 
-                LogInfo("{}: Port {} is open", std::string_view(addr), port);
-        };
-    for (auto host : aliveHosts)
+    for (auto target : targets)
     {
-        LogTrace("Scanning {}...", std::string_view(host));
-        for (int i = 0; i < threadCount; i++) threads[i] = std::thread(scan, IpAddress(host), &ports[i]);
+        LogTrace("Scanning {}...", std::string_view(target));
+        for (int i = 0; i < threadCount; i++) threads[i] = std::thread(scan, Target(target), &ports[i]);
         for (int i = 0; i < threadCount; i++) threads[i].join();
-        //for (auto port : portsToScan)
-        //{
-        //     futures.push_back(std::async(std::launch::async, scanPort, IpAddress(host), port));
-        //}
     }
 };
 
-bool PortScanner::PortIsOpen(IpAddress ip, uint16_t port)
+bool PortScanner::PortIsOpen(Target ip, uint16_t port)
 {
     const char* target = ip.addr.data();
 
@@ -169,17 +168,7 @@ bool PortScanner::PortIsOpen(IpAddress ip, uint16_t port)
 
     lock.lock();
     sockets.push({sock, target, port});
-    size_t queueSize = sockets.size();
     lock.unlock();
-    /*if (queueSize > 64)
-    {
-        lock.lock();
-        Socket socket = sockets.front();
-        sock = socket.sock;
-        sockets.pop();
-        lock.unlock();
-        return socket.IsConnected();
-    }*/
     return false;
 }
 

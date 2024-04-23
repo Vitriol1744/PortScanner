@@ -17,10 +17,10 @@ struct Socket
     bool IsConnected();
 };
 
-struct IpAddress
+struct Target
 {
     //TODO: Validate ip addresses
-    IpAddress(std::string_view addr)
+    Target(std::string_view addr)
         : addr(addr) { }
 
     enum class Type
@@ -30,11 +30,15 @@ struct IpAddress
     };
 
     operator std::string_view() const { return addr; }
-
+    auto operator<=>(const Target& other) const
+    {
+        return addr <=> other.addr;
+    }  
     std::string_view addr;
+    std::set<int> openPorts;
 };
 
-inline std::ostream& operator<<(std::ostream& os, const IpAddress& ip)
+inline std::ostream& operator<<(std::ostream& os, const Target& ip)
 {
     os << ip.addr;
     return os;
@@ -48,8 +52,9 @@ class PortScanner
         
         void ParsePortsToScan(char* ports);
 
-        void ScanPorts(std::vector<IpAddress> addresses);
-        static bool PortIsOpen(IpAddress ip, uint16_t port);
+        void Scan(std::set<Target>& targets);
+        void ScanPorts(std::set<Target>& targets);
+        static bool PortIsOpen(Target ip, uint16_t port);
 
     private:
         int threadCount;

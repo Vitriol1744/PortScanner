@@ -12,7 +12,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <oping.h>
-#include <chrono>
 
 bool compareFlag(const char* flag, const char* eq)
 {
@@ -47,12 +46,19 @@ int main(int argc, char** argv)
 {
     if (argc < 2) help();
     std::vector<std::string_view> args(argv + 1, argv + argc);
-    std::vector<IpAddress> addresses;
+    std::set<Target> targets;
     int threads = 64;
     char* ports = nullptr;
+    int nmapArgsIndex = -1;
+
     for (int i = 1; i < argc; i ++)
     {
-        if (compareFlag(argv[i], "-p")) 
+        if (strcmp(argv[i], "--") == 0)
+        {
+            nmapArgsIndex = i + 1;
+            break;
+        }
+        else if (compareFlag(argv[i], "-p")) 
         {
             ports = (char*)getArgument(argv, i);
         }
@@ -61,14 +67,25 @@ int main(int argc, char** argv)
         else if (compareFlag(argv[i], "-h"))
             help();
         else
-            addresses.push_back(std::string_view(argv[i]));
+        {
+            std::string_view target(argv[i]);
+            for (auto c : target)
+            {
+                if (!isdigit(c) && c != '.')
+                {
+                    LogError("{}: Invalid Target ip address!", target);
+                    return EXIT_FAILURE;
+                }
+            }
+            targets.insert(target);
+        }
     }
 
 
     PortScanner scanner(threads);
     if (ports)
         scanner.ParsePortsToScan(ports);
-    scanner.ScanPorts(addresses);
+    scanner.Scan(targets);
 
     return EXIT_SUCCESS;
 }
