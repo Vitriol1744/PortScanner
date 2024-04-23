@@ -16,6 +16,33 @@
 #include <thread>
 #include <queue>
 
+std::queue<Socket> PortScanner::sockets{};
+std::mutex lock;
+
+bool Socket::IsConnected()
+{
+    fd_set input;
+    FD_ZERO(&input);
+    FD_SET(sock, &input);
+    timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 20 * 1000;
+    int status = select(sock + 1, nullptr, &input, nullptr, &tv);
+    if (status == 1)
+    {
+        int err = 0;
+        socklen_t len = sizeof(err);
+        getsockopt(sock, SOL_SOCKET, SO_ERROR, (void*)&err, &len);
+        if (err == 0)
+        {
+            close(sock);
+            return true;
+        }
+    }
+    close(sock);
+    return false;
+}
+
 void PortScanner::ParsePortsToScan(char* ports)
 {
     auto parseInt = [](char*& str) -> char*
@@ -79,8 +106,18 @@ void PortScanner::ScanPorts(std::vector<IpAddress> addresses)
     {
         for (auto port : *ports)
         {
+            if (sockets.size() > 512)
+            {
+                lock.lock();
+                Socket socket = sockets.front();
+                sockets.pop();
+                lock.unlock();
+                if (socket.IsConnected())
+                    LogInfo("{}: Port {} is open", socket.target, socket.port);
+
+            }
             if (PortScanner::PortIsOpen(host, port))
-                LogInfo("{}: Port {} is open", std::string_view(host), port);
+ ;//               LogInfo("{}: Port {} is open", std::string_view(host), port);
         }
     };
     auto scanPort = [](IpAddress addr, int port)
@@ -103,7 +140,6 @@ void PortScanner::ScanPorts(std::vector<IpAddress> addresses)
 bool PortScanner::PortIsOpen(IpAddress ip, uint16_t port)
 {
     const char* target = ip.addr.data();
-    static std::queue<int> socketQueue;
 
     sockaddr_in target_address{};
     target_address.sin_family = AF_INET;
@@ -131,28 +167,19 @@ bool PortScanner::PortIsOpen(IpAddress ip, uint16_t port)
         return true;
     };
 
-    socketQueue.push(sock);
-    static constexpr const uint32_t SECONDS = 1;
-    fd_set         input;
-    FD_ZERO(&input);
-    FD_SET(sock, &input);
-    struct timeval tv;
-    tv.tv_sec  = 0;
-    tv.tv_usec = 100 * 1000;
-    status = select(sock + 1, nullptr, &input, nullptr, &tv);
-    if (status == 1)
+    lock.lock();
+    sockets.push({sock, target, port});
+    size_t queueSize = sockets.size();
+    lock.unlock();
+    /*if (queueSize > 64)
     {
-        int err = 0;
-        socklen_t len = sizeof(err);
-        getsockopt(sock, SOL_SOCKET, SO_ERROR, (void*)&err, &len);
-        if (err == 0)
-        {
-            close(sock);
-            return true;
-        }
-    }
-
-    close(sock);
+        lock.lock();
+        Socket socket = sockets.front();
+        sock = socket.sock;
+        sockets.pop();
+        lock.unlock();
+        return socket.IsConnected();
+    }*/
     return false;
 }
 

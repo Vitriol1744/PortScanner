@@ -6,6 +6,16 @@
 #include <cstdint>
 #include <set>
 #include <future>
+#include <queue>
+
+struct Socket
+{
+    int sock;
+    const char* target;
+    int port;
+
+    bool IsConnected();
+};
 
 struct IpAddress
 {
@@ -46,6 +56,7 @@ class PortScanner
         std::vector<std::thread> threads;
         std::set<int> portsToScan;
         std::vector<std::future<void>> futures;
+        static std::queue<Socket> sockets;
 
         bool Ping(std::string_view target);
 };
