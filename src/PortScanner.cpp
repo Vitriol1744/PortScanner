@@ -15,16 +15,16 @@
 #include <set>
 #include <thread>
 
-char* parseInt(char*& str)
-{
-    char* start = str;
-    while (isdigit(*str)) str++;
-    
-    return start;
-}
-
 void PortScanner::ParsePortsToScan(char* ports)
 {
+    auto parseInt = [](char*& str) -> char*
+    {
+        char* start = str;
+        while (isdigit(*str)) str++;
+    
+        return start;
+    };
+
     while (*ports)
     {
         char* start = parseInt(ports);
@@ -65,7 +65,7 @@ void PortScanner::ScanPorts(std::vector<IpAddress> addresses)
 
     }
 
-    int maxThreads = std::thread::hardware_concurrency();
+    int maxThreads = 64;// std::thread::hardware_concurrency();
     std::vector<int> ports[maxThreads];
     int i = 0;
     // Divide work for threads
@@ -75,24 +75,29 @@ void PortScanner::ScanPorts(std::vector<IpAddress> addresses)
         ports[i].push_back(port);
         i++;
     }
-    auto scan = [](PortScanner* scanner, IpAddress host, std::vector<int>* ports)
+    auto scan = [](IpAddress host, std::vector<int>* ports)
     {
         for (auto port : *ports)
         {
-            if (scanner->PortIsOpen(host, port))
+            if (PortScanner::PortIsOpen(host, port))
                 LogInfo("{}: Port {} is open", std::string_view(host), port);
         }
     };
+    auto scanPort = [](IpAddress addr, int port)
+        {
+            if (PortIsOpen(addr, port)) 
+                LogInfo("{}: Port {} is open", std::string_view(addr), port);
+        };
     for (auto host : aliveHosts)
     {
         LogTrace("Scanning {}...", std::string_view(host));
         std::thread threads[maxThreads];
-        for (int i = 0; i < maxThreads; i++) threads[i] = std::thread(scan, this, IpAddress(host), &ports[i]);
+        for (int i = 0; i < maxThreads; i++) threads[i] = std::thread(scan, IpAddress(host), &ports[i]);
         for (int i = 0; i < maxThreads; i++) threads[i].join();
-        /*for (auto port : portsToScan)
-        {
-             futures.push_back(std::async(std::launch::async, scanPort, IpAddress(host), port));
-        }*/
+        //for (auto port : portsToScan)
+        //{
+        //     futures.push_back(std::async(std::launch::async, scanPort, IpAddress(host), port));
+        //}
     }
 };
 
@@ -102,15 +107,11 @@ bool PortScanner::PortIsOpen(IpAddress ip, uint16_t port)
 
     sockaddr_in target_address{};
     target_address.sin_family = AF_INET;
+    target_address.sin_addr.s_addr = inet_addr(target);
     target_address.sin_port = htons(port);
-    if (inet_pton(PF_INET, target, &target_address.sin_addr) <= 0)
-    {
-        LogError("Invalid IP address\n");
-        return false;
-    }
 
-    int sock = socket(PF_INET, SOCK_STREAM, 0);
-    //fcntl(sock, F_SETFL, O_NONBLOCK);
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    fcntl(sock, F_SETFL, O_NONBLOCK);
     if (sock < 0)
     {
         LogError("Socket could not be create: {}\n", strerror(errno));
@@ -118,11 +119,37 @@ bool PortScanner::PortIsOpen(IpAddress ip, uint16_t port)
         return false;
     }
 
-    if (connect(sock, (struct sockaddr*)&target_address, sizeof(target_address)) == 0)
+    int status = connect(sock, (struct sockaddr*)&target_address, sizeof(target_address));
+    if (status == -1 && errno != EINPROGRESS)
+    {
+        close(sock);
+        return false;
+    }
+    else if (status == 0)
     {
         close(sock);
         return true;
     };
+
+    static constexpr const uint32_t SECONDS = 1;
+    fd_set         input;
+    FD_ZERO(&input);
+    FD_SET(sock, &input);
+    struct timeval tv;
+    tv.tv_sec  = 0;
+    tv.tv_usec = 100 * 1000;
+    status = select(sock + 1, nullptr, &input, nullptr, &tv);
+    if (status == 1)
+    {
+        int err = 0;
+        socklen_t len = sizeof(err);
+        getsockopt(sock, SOL_SOCKET, SO_ERROR, (void*)&err, &len);
+        if (err == 0)
+        {
+            close(sock);
+            return true;
+        }
+    }
 
     close(sock);
     return false;

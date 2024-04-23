@@ -1,7 +1,18 @@
 #include "PortScanner.hpp"
+#include "Logger.hpp"
 
 #include <cstdlib>
 #include <cctype>
+#include <sys/socket.h>
+#include <resolv.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <netinet/ip_icmp.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <oping.h>
+#include <chrono>
 
 bool compareFlag(const char* flag, const char* eq)
 {

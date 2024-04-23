@@ -5,6 +5,7 @@
 #include <iostream>
 #include <cstdint>
 #include <set>
+#include <future>
 
 struct IpAddress
 {
@@ -37,12 +38,11 @@ class PortScanner
         void ParsePortsToScan(char* ports);
 
         void ScanPorts(std::vector<IpAddress> addresses);
-        bool PortIsOpen(IpAddress ip, uint16_t port);
+        static bool PortIsOpen(IpAddress ip, uint16_t port);
 
     private:
         std::set<int> portsToScan;
- //       std::vector<std::future<void>> futures;
-   //     std::atomic<int> openedSockets = 0;
+        std::vector<std::future<void>> futures;
 
         bool Ping(std::string_view target);
 };
