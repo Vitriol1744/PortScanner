@@ -33,7 +33,8 @@ inline std::ostream& operator<<(std::ostream& os, const IpAddress& ip)
 class PortScanner
 {
     public:
-        PortScanner() = default;
+        PortScanner(int threadCount)
+            : threadCount(threadCount) { threads.resize(threadCount); }
         
         void ParsePortsToScan(char* ports);
 
@@ -41,6 +42,8 @@ class PortScanner
         static bool PortIsOpen(IpAddress ip, uint16_t port);
 
     private:
+        int threadCount;
+        std::vector<std::thread> threads;
         std::set<int> portsToScan;
         std::vector<std::future<void>> futures;
 

@@ -14,6 +14,7 @@
 #include <chrono>
 #include <set>
 #include <thread>
+#include <queue>
 
 void PortScanner::ParsePortsToScan(char* ports)
 {
@@ -65,13 +66,12 @@ void PortScanner::ScanPorts(std::vector<IpAddress> addresses)
 
     }
 
-    int maxThreads = 64;// std::thread::hardware_concurrency();
-    std::vector<int> ports[maxThreads];
+    std::vector<int> ports[threadCount];
     int i = 0;
     // Divide work for threads
     for (auto port : portsToScan)
     {
-        if (i >= maxThreads) i = 0;
+        if (i >= threadCount) i = 0;
         ports[i].push_back(port);
         i++;
     }
@@ -91,9 +91,8 @@ void PortScanner::ScanPorts(std::vector<IpAddress> addresses)
     for (auto host : aliveHosts)
     {
         LogTrace("Scanning {}...", std::string_view(host));
-        std::thread threads[maxThreads];
-        for (int i = 0; i < maxThreads; i++) threads[i] = std::thread(scan, IpAddress(host), &ports[i]);
-        for (int i = 0; i < maxThreads; i++) threads[i].join();
+        for (int i = 0; i < threadCount; i++) threads[i] = std::thread(scan, IpAddress(host), &ports[i]);
+        for (int i = 0; i < threadCount; i++) threads[i].join();
         //for (auto port : portsToScan)
         //{
         //     futures.push_back(std::async(std::launch::async, scanPort, IpAddress(host), port));
@@ -104,6 +103,7 @@ void PortScanner::ScanPorts(std::vector<IpAddress> addresses)
 bool PortScanner::PortIsOpen(IpAddress ip, uint16_t port)
 {
     const char* target = ip.addr.data();
+    static std::queue<int> socketQueue;
 
     sockaddr_in target_address{};
     target_address.sin_family = AF_INET;
@@ -131,6 +131,7 @@ bool PortScanner::PortIsOpen(IpAddress ip, uint16_t port)
         return true;
     };
 
+    socketQueue.push(sock);
     static constexpr const uint32_t SECONDS = 1;
     fd_set         input;
     FD_ZERO(&input);

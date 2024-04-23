@@ -24,7 +24,7 @@ bool compareFlag(const char* flag, const char* eq)
     if (!isdigit(*flag) && *flag != 0) return false;
     return true;
 }
-const char* GetArgument(char** argv, int& i)
+const char* getArgument(char** argv, int& i)
 {
 
     while (*argv[i])
@@ -48,14 +48,16 @@ int main(int argc, char** argv)
     if (argc < 2) help();
     std::vector<std::string_view> args(argv + 1, argv + argc);
     std::vector<IpAddress> addresses;
-    PortScanner scanner;
+    int threads = 64;
+    char* ports = nullptr;
     for (int i = 1; i < argc; i ++)
     {
         if (compareFlag(argv[i], "-p")) 
         {
-            char* ports = (char*)GetArgument(argv, i);
-            scanner.ParsePortsToScan(ports);
+            ports = (char*)getArgument(argv, i);
         }
+        else if (compareFlag(argv[i], "-t"))
+                threads = atoi((char*)getArgument(argv, i));
         else if (compareFlag(argv[i], "-h"))
             help();
         else
@@ -63,6 +65,9 @@ int main(int argc, char** argv)
     }
 
 
+    PortScanner scanner(threads);
+    if (ports)
+        scanner.ParsePortsToScan(ports);
     scanner.ScanPorts(addresses);
 
     return EXIT_SUCCESS;
