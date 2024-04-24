@@ -2,20 +2,16 @@
 
 #include <string_view>
 #include <vector>
+#include <thread>
 #include <iostream>
 #include <cstdint>
 #include <set>
-#include <future>
 #include <queue>
 
-struct Socket
-{
-    int sock;
-    const char* target;
-    int port;
-
-    bool IsConnected();
-};
+using usize = size_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using i32 = int32_t;
 
 struct Target
 {
@@ -35,33 +31,54 @@ struct Target
         return addr <=> other.addr;
     }  
     std::string_view addr;
-    std::set<int> openPorts;
+    std::set<u16> openPorts;
+};
+struct Socket
+{
+    i32 sock;
+    Target& target;
+    i32 port;
+
+    bool IsConnected();
+};
+struct SocketQueue
+{
+    void Push(Target& target, u16 port);
+    void Pop();
+
+    inline usize GetSize() const { return sockets.size(); }
+    inline bool Empty() const { return sockets.empty(); }
+
+    inline void Clear()
+    {
+        while (!Empty()) Pop();
+    }
+
+    std::queue<Socket> sockets{};
+    std::mutex lock;
 };
 
-inline std::ostream& operator<<(std::ostream& os, const Target& ip)
+inline std::ostream& operator<<(std::ostream& os, const Target& target)
 {
-    os << ip.addr;
+    os << target.addr;
     return os;
 }
 
 class PortScanner
 {
     public:
-        PortScanner(int threadCount)
+        PortScanner(u16 threadCount)
             : threadCount(threadCount) { threads.resize(threadCount); }
         
         void ParsePortsToScan(char* ports);
 
         void Scan(std::set<Target>& targets);
         void ScanPorts(std::set<Target>& targets);
-        static bool PortIsOpen(Target ip, uint16_t port);
 
     private:
-        int threadCount;
+        u16 threadCount;
         std::vector<std::thread> threads;
-        std::set<int> portsToScan;
-        std::vector<std::future<void>> futures;
-        static std::queue<Socket> sockets;
+        std::set<u16> portsToScan;
 
         bool Ping(std::string_view target);
 };
