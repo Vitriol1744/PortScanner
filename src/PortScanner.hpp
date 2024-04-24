@@ -3,7 +3,7 @@
 #include <string_view>
 #include <vector>
 #include <thread>
-#include <iostream>
+#include <mutex>
 #include <cstdint>
 #include <set>
 #include <queue>
@@ -35,6 +35,13 @@ struct Target
 };
 struct Socket
 {
+    Socket(Target& target, i32 port) : sock(-1), target(target), port(port) { }
+    ~Socket();
+    //Socket (const Socket&) = delete;
+    //Socket& operator= (const Socket&) = delete;
+    
+    void Connect(Target& target, i32 port);
+
     i32 sock;
     Target& target;
     i32 port;
@@ -43,7 +50,7 @@ struct Socket
 };
 struct SocketQueue
 {
-    void Push(Target& target, u16 port);
+    void Push(Socket& socket);
     void Pop();
 
     inline usize GetSize() const { return sockets.size(); }

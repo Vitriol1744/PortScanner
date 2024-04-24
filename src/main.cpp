@@ -1,17 +1,7 @@
 #include "PortScanner.hpp"
 #include "Logger.hpp"
 
-#include <cstdlib>
 #include <cctype>
-#include <sys/socket.h>
-#include <resolv.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <netinet/ip_icmp.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <oping.h>
 
 bool compareFlag(const char* flag, const char* eq)
 {
@@ -40,6 +30,7 @@ void help()
     printf("Usage: fastscan <flags> <targets>\n");
     printf("\t-p - ports to scan\n");
     printf("\texample:\t-p12,43,56-234\n");
+    printf("\t-t - number of concurrent threads\n");
 }
 
 int main(int argc, char** argv)

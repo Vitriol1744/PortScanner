@@ -2,21 +2,43 @@
 
 #include "Logger.hpp"
 
-#include <sys/socket.h>
-#include <resolv.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <oping.h>
 #include <chrono>
-#include <set>
-#include <thread>
-#include <queue>
 
 static SocketQueue socketQueue{};
+
+Socket::~Socket()
+{
+    return;
+    if (IsConnected())
+    {
+        LogInfo("{}: Port {} is open", std::string_view(target), port);
+        target.openPorts.insert(port);;
+    }
+}
+
+void Socket::Connect(Target& target, i32 port)
+{
+    const char* addr = target.addr.data();
+
+    sockaddr_in target_address{};
+    target_address.sin_family = AF_INET;
+    target_address.sin_addr.s_addr = inet_addr(addr);
+    target_address.sin_port = htons(port);
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    fcntl(sock, F_SETFL, O_NONBLOCK);
+    if (sock < 0)
+    {
+        LogError("Socket could not be create: {}\n", strerror(errno));
+        return;
+    }
+
+    i32 status = connect(sock, (struct sockaddr*)&target_address, sizeof(target_address));
+    if (status == -1 && errno != EINPROGRESS) close(sock);
+}
 
 bool Socket::IsConnected()
 {
@@ -111,7 +133,9 @@ void PortScanner::ScanPorts(std::set<Target>& targets)
         {
             if (socketQueue.GetSize() > 512)
                 socketQueue.Pop();
-            socketQueue.Push(target, port);
+            Socket socket = {target, port };
+            socket.Connect(target, port);
+            socketQueue.Push(socket);
         }
     };
     for (auto target : targets)
@@ -142,33 +166,10 @@ bool PortScanner::Ping(std::string_view ip)
     return false;
 }
 
-void SocketQueue::Push(Target& target, u16 port)
+void SocketQueue::Push(Socket& socket)
 {
-    const char* addr = target.addr.data();
-
-    sockaddr_in target_address{};
-    target_address.sin_family = AF_INET;
-    target_address.sin_addr.s_addr = inet_addr(addr);
-    target_address.sin_port = htons(port);
-
-    i32 sock = socket(AF_INET, SOCK_STREAM, 0);
-    fcntl(sock, F_SETFL, O_NONBLOCK);
-    if (sock < 0)
-    {
-        LogError("Socket could not be create: {}\n", strerror(errno));
-        return;
-    }
-
-    i32 status = connect(sock, (struct sockaddr*)&target_address, sizeof(target_address));
-    if (status == -1 && errno != EINPROGRESS) goto failure;
-
-    lock.lock();
-    sockets.push({sock, target, port});
-    lock.unlock();
-    return;
-
-failure:
-    close(sock);
+    std::unique_lock guard(lock);
+    sockets.push(socket);
 }
 void SocketQueue::Pop()
 {
