@@ -2,15 +2,18 @@
 
 #include "Logger.hpp"
 
+#include <thread>
+
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <oping.h>
-#include <chrono>
 
 static SocketQueue socketQueue{};
 static u16 threadCount;
 static std::vector<std::thread> threads;
 static std::set<u16> portsToScan;
+
+inline constexpr const u64 timeout = 100;
 
 Socket::~Socket()
 {
@@ -41,6 +44,7 @@ void Socket::Connect(Target& target, i32 port)
 
     i32 status = connect(sock, (struct sockaddr*)&target_address, sizeof(target_address));
     if (status == -1 && errno != EINPROGRESS) close(sock);
+    timer.Restart();
 }
 
 bool Socket::IsConnected()
@@ -50,7 +54,7 @@ bool Socket::IsConnected()
     FD_SET(sock, &input);
     timeval tv;
     tv.tv_sec = 0;
-    tv.tv_usec = 20 * 1000;
+    tv.tv_usec = 30 * 1000;
     i32 status = select(sock + 1, nullptr, &input, nullptr, &tv);
     if (status == 1)
     {
@@ -111,17 +115,14 @@ void PortScanner::ParsePortsToScan(char* ports)
 
 void PortScanner::Scan(std::set<Target>& targets)
 {
-    std::set<Target> aliveTargets;
     for (auto target : targets)
     {
-        if (Ping(target)) 
-        {
-            aliveTargets.insert(target);
-            LogInfo("{} is Alive", std::string_view(target));
-        }
-        else LogInfo("{} is Down", std::string_view(target));
+        Ping(target);
+        //if (Ping(target)) 
+        //    LogInfo("{} is Alive", std::string_view(target));
+        //else LogInfo("{} is Down or doesn't respond to ICMP packets", std::string_view(target));
     }
-    ScanPorts(aliveTargets);
+    ScanPorts(targets);
 }
 
 void PortScanner::ScanPorts(std::set<Target>& targets)
@@ -161,18 +162,19 @@ bool PortScanner::Ping(std::string_view ip)
     pingobj_t * pingObj = ping_construct();
     ping_host_add(pingObj, ip.data());
 
-    auto startTime = std::chrono::high_resolution_clock::now();
-    auto ret = ping_send(pingObj);
-    auto endTime = std::chrono::high_resolution_clock::now();
-    if (ret > 0)
+    Timer timer;
+    bool ret = false;
+    auto status = ping_send(pingObj);
+    if (status > 0)
     {
-        auto duration = (double)std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count()/1000.0;
-        return true;
-    } 
+        LogInfo("{} is Alive(replied in {:0.2f}s)", ip, timer.Elapsed().Seconds());
+            ret = true;
+    }
+    else LogInfo("{} is Down or doesn't respond to ICMP packets", ip);
     
     ping_destroy(pingObj);
     
-    return false;
+    return ret;
 }
 
 void SocketQueue::Push(Socket& socket)

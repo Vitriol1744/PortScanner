@@ -1,5 +1,6 @@
 #include "PortScanner.hpp"
 #include "Logger.hpp"
+#include "Timer.hpp"
 
 #include <cctype>
 
@@ -35,6 +36,7 @@ void help()
 
 int main(int argc, char** argv)
 {
+    Timer timer;
     if (argc < 2) help();
     std::vector<std::string_view> args(argv + 1, argv + argc);
     std::set<Target> targets;
@@ -78,5 +80,6 @@ int main(int argc, char** argv)
         PortScanner::ParsePortsToScan(ports);
     PortScanner::Scan(targets);
 
+    LogInfo("Finished in {}s\n", timer.Elapsed().Seconds());
     return EXIT_SUCCESS;
 }

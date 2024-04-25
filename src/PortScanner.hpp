@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Timer.hpp"
+
 #include <string_view>
-#include <vector>
-#include <thread>
 #include <mutex>
 #include <cstdint>
 #include <set>
@@ -11,6 +11,7 @@
 using usize = size_t;
 using u16 = uint16_t;
 using u32 = uint32_t;
+using u64 = uint64_t;
 using i32 = int32_t;
 
 struct Target
@@ -45,6 +46,7 @@ struct Socket
     i32 sock;
     Target& target;
     i32 port;
+    Timer timer;
 
     bool IsConnected();
 };
