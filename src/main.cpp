@@ -38,7 +38,7 @@ int main(int argc, char** argv)
     if (argc < 2) help();
     std::vector<std::string_view> args(argv + 1, argv + argc);
     std::set<Target> targets;
-    int threads = 64;
+    u16 threads = 64;
     char* ports = nullptr;
     int nmapArgsIndex = -1;
 
@@ -72,8 +72,7 @@ int main(int argc, char** argv)
         }
     }
 
-
-    PortScanner scanner(threads);
+    PortScanner scanner(threads > 64 ? 64 : threads);
     if (ports)
         scanner.ParsePortsToScan(ports);
     scanner.Scan(targets);
