@@ -8,6 +8,9 @@
 #include <chrono>
 
 static SocketQueue socketQueue{};
+static u16 threadCount;
+static std::vector<std::thread> threads;
+static std::set<u16> portsToScan;
 
 Socket::~Socket()
 {
@@ -62,6 +65,12 @@ bool Socket::IsConnected()
     }
     close(sock);
     return false;
+}
+
+void PortScanner::Initialize(u16 threadCount)
+{
+    ::threadCount = threadCount;
+    threads.resize(threadCount);
 }
 
 void PortScanner::ParsePortsToScan(char* ports)
@@ -127,7 +136,7 @@ void PortScanner::ScanPorts(std::set<Target>& targets)
         i++;
     }
 
-    auto worker = [this](Target target, std::vector<u16>& ports)
+    auto worker = [](Target target, std::vector<u16>& ports)
     {
         for (auto port : ports)
         {

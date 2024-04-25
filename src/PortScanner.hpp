@@ -71,21 +71,14 @@ inline std::ostream& operator<<(std::ostream& os, const Target& target)
     return os;
 }
 
-class PortScanner
+namespace PortScanner
 {
-    public:
-        PortScanner(u16 threadCount)
-            : threadCount(threadCount) { threads.resize(threadCount); }
+        void Initialize(u16 threadCount);
         
         void ParsePortsToScan(char* ports);
 
         void Scan(std::set<Target>& targets);
         void ScanPorts(std::set<Target>& targets);
-
-    private:
-        u16 threadCount;
-        std::vector<std::thread> threads;
-        std::set<u16> portsToScan;
 
         bool Ping(std::string_view target);
 };

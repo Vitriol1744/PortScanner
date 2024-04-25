@@ -72,10 +72,11 @@ int main(int argc, char** argv)
         }
     }
 
-    PortScanner scanner(threads > 64 ? 64 : threads);
+    //PortScanner scanner(threads > 64 ? 64 : threads);
+    PortScanner::Initialize(threads > 64 ? 64 : threads);
     if (ports)
-        scanner.ParsePortsToScan(ports);
-    scanner.Scan(targets);
+        PortScanner::ParsePortsToScan(ports);
+    PortScanner::Scan(targets);
 
     return EXIT_SUCCESS;
 }
