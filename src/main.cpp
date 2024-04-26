@@ -2,6 +2,8 @@
 #include "Logger.hpp"
 #include "Timer.hpp"
 
+#include <unistd.h>
+#include <getopt.h>
 #include <cctype>
 
 bool compareFlag(const char* flag, const char* eq)
@@ -36,6 +38,11 @@ void help()
 
 int main(int argc, char** argv)
 {
+    option options[] = {
+        { "ports", required_argument, 0, 'c' },
+        { "threads", required_argument, 0, 't' },
+        { "help", no_argument, 0, 'h' },
+    };
     Timer timer;
     if (argc < 2) help();
     std::vector<std::string_view> args(argv + 1, argv + argc);
@@ -44,34 +51,37 @@ int main(int argc, char** argv)
     char* ports = nullptr;
     int nmapArgsIndex = -1;
 
-    for (int i = 1; i < argc; i ++)
+    int optionIndex = 0;
+    while (true)
     {
-        if (strcmp(argv[i], "--") == 0)
+        int c = getopt_long(argc, argv, "p:t:h", options, &optionIndex);
+        if (c == -1) break;
+        switch (c)
         {
-            nmapArgsIndex = i + 1;
-            break;
+            case 'p':
+                ports = optarg;
+                break;
+            case 't':
+                threads = atoi(optarg);
+                break;
+            case 'h':
+
+            default:
+                help();
+                return EXIT_FAILURE;
         }
-        else if (compareFlag(argv[i], "-p")) 
+    }
+    if (optind < argc)
+    {
+        while (optind < argc)
         {
-            ports = (char*)getArgument(argv, i);
+            targets.insert(std::string_view(argv[optind++]));
         }
-        else if (compareFlag(argv[i], "-t"))
-                threads = atoi((char*)getArgument(argv, i));
-        else if (compareFlag(argv[i], "-h"))
-            help();
-        else
-        {
-            std::string_view target(argv[i]);
-            for (auto c : target)
-            {
-                if (!isdigit(c) && c != '.')
-                {
-                    LogError("{}: Invalid Target ip address!", target);
-                    return EXIT_FAILURE;
-                }
-            }
-            targets.insert(target);
-        }
+    }
+    else
+    {
+        LogError("No targets specified");
+        return EXIT_FAILURE;
     }
 
     //PortScanner scanner(threads > 64 ? 64 : threads);

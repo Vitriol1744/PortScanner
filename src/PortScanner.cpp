@@ -54,7 +54,7 @@ bool Socket::IsConnected()
     FD_SET(sock, &input);
     timeval tv;
     tv.tv_sec = 0;
-    tv.tv_usec = 30 * 1000;
+    tv.tv_usec = 20 * 1000;
     i32 status = select(sock + 1, nullptr, &input, nullptr, &tv);
     if (status == 1)
     {
