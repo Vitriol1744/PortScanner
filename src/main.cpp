@@ -4,29 +4,6 @@
 
 #include <unistd.h>
 #include <getopt.h>
-#include <cctype>
-
-bool compareFlag(const char* flag, const char* eq)
-{
-    while (*eq)
-    {
-        if (*flag++ != *eq++) return false;
-    }
-
-    if (!isdigit(*flag) && *flag != 0) return false;
-    return true;
-}
-const char* getArgument(char** argv, int& i)
-{
-
-    while (*argv[i])
-    {
-        if (isdigit(*argv[i])) return argv[i];
-        argv[i]++;
-    }
-
-    return argv[++i];
-}
 
 void help()
 {
