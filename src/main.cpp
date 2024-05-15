@@ -11,6 +11,7 @@ void help()
     printf("\t-p - ports to scan\n");
     printf("\texample:\t-p12,43,56-234\n");
     printf("\t-t - number of concurrent threads\n");
+    printf("\t-n - don't run nmap\n");
 }
 
 int main(int argc, char** argv)
@@ -19,6 +20,7 @@ int main(int argc, char** argv)
         { "ports", required_argument, 0, 'c' },
         { "threads", required_argument, 0, 't' },
         { "help", no_argument, 0, 'h' },
+        { "no-nmap", no_argument, 0, 'n' },
     };
     Timer timer;
     if (argc < 2) help();
@@ -27,6 +29,7 @@ int main(int argc, char** argv)
     u16 threads = 64;
     char* ports = nullptr;
     int nmapArgsIndex = -1;
+    Flags flags = Flags::eNone;
 
     int optionIndex = 0;
     while (true)
@@ -40,6 +43,9 @@ int main(int argc, char** argv)
                 break;
             case 't':
                 threads = atoi(optarg);
+                break;
+            case 'n':
+                flags = static_cast<Flags>(static_cast<u32>(Flags::eNoNmap) | static_cast<u32>(flags));
                 break;
             case 'h':
 
@@ -61,8 +67,7 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    //PortScanner scanner(threads > 64 ? 64 : threads);
-    PortScanner::Initialize(threads > 64 ? 64 : threads);
+    PortScanner::Initialize(threads > 64 ? 64 : threads, flags);
     if (ports)
         PortScanner::ParsePortsToScan(ports);
     PortScanner::Scan(targets);

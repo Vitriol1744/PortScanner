@@ -14,6 +14,22 @@ using u32 = uint32_t;
 using u64 = uint64_t;
 using i32 = int32_t;
 
+inline constexpr const usize BIT(u32 n) { return 1 << n; }
+
+enum class Flags
+{
+    eNone = BIT(0),
+    eNoNmap = BIT(1),
+};
+
+struct Options
+{
+    std::set<u16> ports;
+    u16 threads;
+
+    void ParsePorts(char* ports);
+};
+
 struct Target
 {
     //TODO: Validate ip addresses
@@ -75,7 +91,7 @@ inline std::ostream& operator<<(std::ostream& os, const Target& target)
 
 namespace PortScanner
 {
-        void Initialize(u16 threadCount);
+        void Initialize(u16 threadCount, Flags flags);
         
         void ParsePortsToScan(char* ports);
 

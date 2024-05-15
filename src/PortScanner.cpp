@@ -4,7 +4,9 @@
 
 #include <thread>
 
+#include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <oping.h>
 
@@ -12,6 +14,7 @@ static SocketQueue socketQueue{};
 static u16 threadCount;
 static std::vector<std::thread> threads;
 static std::set<u16> portsToScan;
+static Flags flags;
 
 inline constexpr const u64 timeout = 100;
 
@@ -71,9 +74,10 @@ bool Socket::IsConnected()
     return false;
 }
 
-void PortScanner::Initialize(u16 threadCount)
+void PortScanner::Initialize(u16 threadCount, Flags flags)
 {
     ::threadCount = threadCount;
+    ::flags = flags;
     threads.resize(threadCount);
 }
 
@@ -123,6 +127,46 @@ void PortScanner::Scan(std::set<Target>& targets)
         //else LogInfo("{} is Down or doesn't respond to ICMP packets", std::string_view(target));
     }
     ScanPorts(targets);
+
+    if (static_cast<u32>(flags) & static_cast<u32>(Flags::eNoNmap)) return;
+    for (auto& target : targets)
+    {
+        if (target.openPorts.empty()) continue;
+         std::string ports = "-p";
+        for (auto port : target.openPorts)
+            ports += std::to_string(port) + ",";
+        ports.erase(ports.begin(), std::find_if(ports.begin(), ports.end(), [](unsigned char ch) {
+            return ch != ',';
+        }));
+         std::vector<const char*> args =
+            {
+                "/usr/bin/nmap",
+                "-sV",
+                "-sC",
+                "-T5",
+                "-vv",
+                ports.data(),
+                "-O",
+                target.addr.data(),
+            };
+        pid_t pid = fork();
+        if (pid == 0)
+        {
+            execvp((char*)"nmap", (char**)args.data());
+            LogError("Failed to call nmap");
+            exit(EXIT_FAILURE);
+        }
+        else if (pid < 0) LogError("fatal");
+        else
+        {
+            int status;
+            pid_t wpid;
+            do
+            {
+                wpid = waitpid(pid, &status, WUNTRACED);
+            } while (!WIFEXITED(status) && !WIFSIGNALED(status)); 
+        }
+    }
 }
 
 void PortScanner::ScanPorts(std::set<Target>& targets)
@@ -137,21 +181,21 @@ void PortScanner::ScanPorts(std::set<Target>& targets)
         i++;
     }
 
-    auto worker = [](Target target, std::vector<u16>& ports)
+    auto worker = [](Target* target, std::vector<u16>& ports)
     {
         for (auto port : ports)
         {
             if (socketQueue.GetSize() > 512)
                 socketQueue.Pop();
-            Socket socket = {target, port };
-            socket.Connect(target, port);
+            Socket socket = {*target, port };
+            socket.Connect(*target, port);
             socketQueue.Push(socket);
         }
     };
-    for (auto target : targets)
+    for (const Target& target : targets)
     {
         LogTrace("Scanning {}...", std::string_view(target));
-        for (u32 i = 0; i < threadCount; i++) threads[i] = std::thread(worker, target, std::ref(ports[i]));
+        for (u32 i = 0; i < threadCount; i++) threads[i] = std::thread(worker, (Target*)&target, std::ref(ports[i]));
         for (u32 i = 0; i < threadCount; i++) threads[i].join();
         socketQueue.Clear();
     }
