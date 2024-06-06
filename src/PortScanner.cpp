@@ -4,19 +4,21 @@
 
 #include <thread>
 
-#include <unistd.h>
 #include <arpa/inet.h>
-#include <sys/wait.h>
 #include <fcntl.h>
 #include <oping.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
-static SocketQueue socketQueue{};
-static u16 threadCount;
+static SocketQueue              socketQueue{};
+static u16                      threadCount;
 static std::vector<std::thread> threads;
-static std::set<u16> portsToScan;
-static Flags flags;
+static std::set<u16>            portsToScan;
+static Flags                    flags;
 
-inline constexpr const u64 timeout = 100;
+inline constexpr const u64      timeout      = 100;
+inline constexpr const u32      LOWEST_PORT  = 1;
+inline constexpr const u32      HIGHEST_PORT = 65535;
 
 Socket::~Socket()
 {
@@ -24,7 +26,8 @@ Socket::~Socket()
     if (IsConnected())
     {
         LogInfo("{}: Port {} is open", std::string_view(target), port);
-        target.openPorts.insert(port);;
+        target.openPorts.insert(port);
+        ;
     }
 }
 
@@ -33,11 +36,11 @@ void Socket::Connect(Target& target, i32 port)
     const char* addr = target.addr.data();
 
     sockaddr_in target_address{};
-    target_address.sin_family = AF_INET;
+    target_address.sin_family      = AF_INET;
     target_address.sin_addr.s_addr = inet_addr(addr);
-    target_address.sin_port = htons(port);
+    target_address.sin_port        = htons(port);
 
-    sock = socket(AF_INET, SOCK_STREAM, 0);
+    sock                           = socket(AF_INET, SOCK_STREAM, 0);
     fcntl(sock, F_SETFL, O_NONBLOCK);
     if (sock < 0)
     {
@@ -45,7 +48,8 @@ void Socket::Connect(Target& target, i32 port)
         return;
     }
 
-    i32 status = connect(sock, (struct sockaddr*)&target_address, sizeof(target_address));
+    i32 status = connect(sock, (struct sockaddr*)&target_address,
+                         sizeof(target_address));
     if (status == -1 && errno != EINPROGRESS) close(sock);
     timer.Restart();
 }
@@ -56,12 +60,12 @@ bool Socket::IsConnected()
     FD_ZERO(&input);
     FD_SET(sock, &input);
     timeval tv;
-    tv.tv_sec = 0;
+    tv.tv_sec  = 0;
     tv.tv_usec = 20 * 1000;
     i32 status = select(sock + 1, nullptr, &input, nullptr, &tv);
     if (status == 1)
     {
-        i32 err = 0;
+        i32       err = 0;
         socklen_t len = sizeof(err);
         getsockopt(sock, SOL_SOCKET, SO_ERROR, (void*)&err, &len);
         if (err == 0)
@@ -77,17 +81,23 @@ bool Socket::IsConnected()
 void PortScanner::Initialize(u16 threadCount, Flags flags)
 {
     ::threadCount = threadCount;
-    ::flags = flags;
+    ::flags       = flags;
     threads.resize(threadCount);
 }
 
 void PortScanner::ParsePortsToScan(char* ports)
 {
+    if (strcmp(ports, "-") == 0)
+    {
+        for (usize i = LOWEST_PORT; i <= HIGHEST_PORT; i++)
+            portsToScan.insert(i);
+        return;
+    }
     auto parseInt = [](char*& str) -> char*
     {
         char* start = str;
         while (isdigit(*str)) str++;
-    
+
         return start;
     };
 
@@ -101,18 +111,18 @@ void PortScanner::ParsePortsToScan(char* ports)
         }
         else if (*ports == '-')
         {
-            *ports++ = 0;
+            *ports++  = 0;
             char* end = parseInt(ports);
             if (*ports)
             {
-                if (*ports != ',') throw std::runtime_error("Invalid ports range!");
+                if (*ports != ',')
+                    throw std::runtime_error("Invalid ports range!");
                 *ports++ = 0;
             }
 
             u32 portsStart = atoi(start);
-            u32 portsEnd = atoi(end);
-            for (u32 i = portsStart; i <= portsEnd; i++)
-                portsToScan.insert(i);
+            u32 portsEnd   = atoi(end);
+            for (u32 i = portsStart; i <= portsEnd; i++) portsToScan.insert(i);
         }
     }
 }
@@ -122,9 +132,10 @@ void PortScanner::Scan(std::set<Target>& targets)
     for (auto target : targets)
     {
         Ping(target);
-        //if (Ping(target)) 
-        //    LogInfo("{} is Alive", std::string_view(target));
-        //else LogInfo("{} is Down or doesn't respond to ICMP packets", std::string_view(target));
+        // if (Ping(target))
+        //     LogInfo("{} is Alive", std::string_view(target));
+        // else LogInfo("{} is Down or doesn't respond to ICMP packets",
+        // std::string_view(target));
     }
     ScanPorts(targets);
 
@@ -132,23 +143,15 @@ void PortScanner::Scan(std::set<Target>& targets)
     for (auto& target : targets)
     {
         if (target.openPorts.empty()) continue;
-         std::string ports = "-p";
-        for (auto port : target.openPorts)
-            ports += std::to_string(port) + ",";
-        ports.erase(ports.begin(), std::find_if(ports.begin(), ports.end(), [](unsigned char ch) {
-            return ch != ',';
-        }));
-         std::vector<const char*> args =
-            {
-                "/usr/bin/nmap",
-                "-sV",
-                "-sC",
-                "-T5",
-                "-vv",
-                ports.data(),
-                "-O",
-                target.addr.data(),
-            };
+        std::string ports = "-p";
+        for (auto port : target.openPorts) ports += std::to_string(port) + ",";
+        ports.erase(ports.begin(),
+                    std::find_if(ports.begin(), ports.end(),
+                                 [](unsigned char ch) { return ch != ','; }));
+        std::vector<const char*> args = {
+            "/usr/bin/nmap", "-sV",        "-sC", "-T5",
+            "-vv",           ports.data(), "-O",  target.addr.data(),
+        };
         pid_t pid = fork();
         if (pid == 0)
         {
@@ -159,12 +162,11 @@ void PortScanner::Scan(std::set<Target>& targets)
         else if (pid < 0) LogError("fatal");
         else
         {
-            int status;
+            int   status;
             pid_t wpid;
-            do
-            {
+            do {
                 wpid = waitpid(pid, &status, WUNTRACED);
-            } while (!WIFEXITED(status) && !WIFSIGNALED(status)); 
+            } while (!WIFEXITED(status) && !WIFSIGNALED(status));
         }
     }
 }
@@ -173,7 +175,7 @@ void PortScanner::ScanPorts(std::set<Target>& targets)
 {
     // Divide work for threads
     std::vector<u16> ports[threadCount];
-    u16 i = 0;
+    u16              i = 0;
     for (auto port : portsToScan)
     {
         if (i >= threadCount) i = 0;
@@ -185,9 +187,8 @@ void PortScanner::ScanPorts(std::set<Target>& targets)
     {
         for (auto port : ports)
         {
-            if (socketQueue.GetSize() > 512)
-                socketQueue.Pop();
-            Socket socket = {*target, port };
+            if (socketQueue.GetSize() > 512) socketQueue.Pop();
+            Socket socket = {*target, port};
             socket.Connect(*target, port);
             socketQueue.Push(socket);
         }
@@ -195,7 +196,9 @@ void PortScanner::ScanPorts(std::set<Target>& targets)
     for (const Target& target : targets)
     {
         LogTrace("Scanning {}...", std::string_view(target));
-        for (u32 i = 0; i < threadCount; i++) threads[i] = std::thread(worker, (Target*)&target, std::ref(ports[i]));
+        for (u32 i = 0; i < threadCount; i++)
+            threads[i]
+                = std::thread(worker, (Target*)&target, std::ref(ports[i]));
         for (u32 i = 0; i < threadCount; i++) threads[i].join();
         socketQueue.Clear();
     }
@@ -203,21 +206,22 @@ void PortScanner::ScanPorts(std::set<Target>& targets)
 
 bool PortScanner::Ping(std::string_view ip)
 {
-    pingobj_t * pingObj = ping_construct();
+    pingobj_t* pingObj = ping_construct();
     ping_host_add(pingObj, ip.data());
 
     Timer timer;
-    bool ret = false;
-    auto status = ping_send(pingObj);
+    bool  ret    = false;
+    auto  status = ping_send(pingObj);
     if (status > 0)
     {
-        LogInfo("{} is Alive(replied in {:0.2f}s)", ip, timer.Elapsed().Seconds());
-            ret = true;
+        LogInfo("{} is Alive(replied in {:0.2f}s)", ip,
+                timer.Elapsed().Seconds());
+        ret = true;
     }
     else LogInfo("{} is Down or doesn't respond to ICMP packets", ip);
-    
+
     ping_destroy(pingObj);
-    
+
     return ret;
 }
 
@@ -235,7 +239,9 @@ void SocketQueue::Pop()
     lock.unlock();
     if (socket.IsConnected())
     {
-        LogInfo("{}: Port {} is open", std::string_view(socket.target), socket.port);
-        socket.target.openPorts.insert(socket.port);;
+        LogInfo("{}: Port {} is open", std::string_view(socket.target),
+                socket.port);
+        socket.target.openPorts.insert(socket.port);
+        ;
     }
 }
