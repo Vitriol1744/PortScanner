@@ -21,6 +21,8 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 
 run: $(BUILD_DIR)/$(BINARY)
 	./$(BUILD_DIR)/$(BINARY)
+install:
+	install $(BUILD_DIR)/$(BINARY) $SYSROOT/bin
 
 .PHONY: clean
 clean:
