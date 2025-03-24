@@ -6,7 +6,7 @@ BUILD_DIR := ./build
 CXX ?= clang++
 SYSROOT ?= /
 
-CXX_FLAGS := -std=c++20 -IThirdParty/fmt/include --sysroot=$SYSROOT
+CXX_FLAGS := -std=c++20 -IThirdParty/fmt/include --sysroot=$(SYSROOT)
 LDFLAGS := 
 
 SRCS := $(shell find $(SRC_DIR) -name '*.cpp')
@@ -22,7 +22,7 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 run: $(BUILD_DIR)/$(BINARY)
 	./$(BUILD_DIR)/$(BINARY)
 install:
-	install $(BUILD_DIR)/$(BINARY) $SYSROOT/bin
+	install $(BUILD_DIR)/$(BINARY) $(SYSROOT)/bin
 
 .PHONY: clean
 clean:
