@@ -6,7 +6,7 @@
 
 #include <arpa/inet.h>
 #include <fcntl.h>
-#include <oping.h>
+// #include <oping.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -206,21 +206,21 @@ void PortScanner::ScanPorts(std::set<Target>& targets)
 
 bool PortScanner::Ping(std::string_view ip)
 {
-    pingobj_t* pingObj = ping_construct();
-    ping_host_add(pingObj, ip.data());
+    // pingobj_t* pingObj = ping_construct();
+    // ping_host_add(pingObj, ip.data());
 
     Timer timer;
-    bool  ret    = false;
-    auto  status = ping_send(pingObj);
-    if (status > 0)
+    bool  ret = false;
+    // auto  status = ping_send(pingObj);
+    // if (status > 0)
     {
-        LogInfo("{} is Alive(replied in {:0.2f}s)", ip,
-                timer.Elapsed().Seconds());
-        ret = true;
+        //    LogInfo("{} is Alive(replied in {:0.2f}s)", ip,
+        //            timer.Elapsed().Seconds());
+        //  ret = true;
     }
-    else LogInfo("{} is Down or doesn't respond to ICMP packets", ip);
+    // else LogInfo("{} is Down or doesn't respond to ICMP packets", ip);
 
-    ping_destroy(pingObj);
+    // ping_destroy(pingObj);
 
     return ret;
 }

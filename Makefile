@@ -3,10 +3,11 @@ BINARY := fastscan
 SRC_DIR := ./src
 BUILD_DIR := ./build
 
-CXX := clang++
+CXX ?= clang++
+SYSROOT ?= /
 
-CXX_FLAGS := -std=c++20 -IThirdParty/fmt/include
-LDFLAGS := -loping
+CXX_FLAGS := -std=c++20 -IThirdParty/fmt/include --sysroot=$SYSROOT
+LDFLAGS := 
 
 SRCS := $(shell find $(SRC_DIR) -name '*.cpp')
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
