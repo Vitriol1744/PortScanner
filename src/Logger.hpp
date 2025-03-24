@@ -2,7 +2,7 @@
 
 #include <iostream>
 #define FMT_HEADER_ONLY 1
-#include <fmt/format.h>
+#include <format>
 
 enum class LogLevel
 {
@@ -13,11 +13,11 @@ enum class LogLevel
     eError
 };
 
-inline constexpr const char* FOREGROUND_COLOR_RED = "\u001b[31m";
-inline constexpr const char* FOREGROUND_COLOR_GREEN = "\u001b[32m";
+inline constexpr const char* FOREGROUND_COLOR_RED    = "\u001b[31m";
+inline constexpr const char* FOREGROUND_COLOR_GREEN  = "\u001b[32m";
 inline constexpr const char* FOREGROUND_COLOR_YELLOW = "\u001b[33m";
-inline constexpr const char* FOREGROUND_COLOR_CYAN = "\u001b[36m";
-inline constexpr const char* COLOR_RESET = "\u001b[0m";
+inline constexpr const char* FOREGROUND_COLOR_CYAN   = "\u001b[36m";
+inline constexpr const char* COLOR_RESET             = "\u001b[0m";
 
 namespace Logger
 {
@@ -53,10 +53,10 @@ namespace Logger
         }
         std::cout << msg << "\n";
     }
-}
+} // namespace Logger
 
-#define LogPlain(...) Logger::Log(LogLevel::ePlain, fmt::format(__VA_ARGS__))
-#define LogTrace(...) Logger::Log(LogLevel::eTrace, fmt::format(__VA_ARGS__))
-#define LogInfo(...)  Logger::Log(LogLevel::eInfo, fmt::format(__VA_ARGS__))
-#define LogWarn(...)  Logger::Log(LogLevel::eWarn, fmt::format(__VA_ARGS__))
-#define LogError(...) Logger::Log(LogLevel::eError, fmt::format(__VA_ARGS__))
+#define LogPlain(...) Logger::Log(LogLevel::ePlain, std::format(__VA_ARGS__))
+#define LogTrace(...) Logger::Log(LogLevel::eTrace, std::format(__VA_ARGS__))
+#define LogInfo(...)  Logger::Log(LogLevel::eInfo, std::format(__VA_ARGS__))
+#define LogWarn(...)  Logger::Log(LogLevel::eWarn, std::format(__VA_ARGS__))
+#define LogError(...) Logger::Log(LogLevel::eError, std::format(__VA_ARGS__))
